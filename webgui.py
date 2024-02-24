@@ -14,7 +14,7 @@ import urllib
 from io import BytesIO
 import requests
 
-def query(url, preprompt, Inputs, stop_word : str, max_tokens):
+def query(url, preprompt, Inputs, stop_word : str, max_tokens, seed):
 
     prompt = f"{preprompt}\n{Inputs}"
 
@@ -27,7 +27,7 @@ def query(url, preprompt, Inputs, stop_word : str, max_tokens):
 
     start_t = time.time()
     api_url = f"{url}/completion"
-    in_data = {"prompt": prompt, "n_predict": max_tokens, "stop" : json_stop}
+    in_data = {"prompt": prompt, "n_predict": max_tokens, "stop" : json_stop, "seed": seed}
 
     # api_url = f"{url}/embedding"
     # in_data = {"content": prompt}
@@ -42,7 +42,9 @@ def query(url, preprompt, Inputs, stop_word : str, max_tokens):
 
     answer = jstring['content'] #.encode('utf-8',errors='ignore')
 
-    return answer
+    stats = f"prompt tokens per second: {jstring['timings']['prompt_per_second']} ; predicted tokens per second: {jstring['timings']['predicted_per_second']} "
+
+    return answer, stats
 
 
 if __name__ == "__main__":
@@ -55,8 +57,10 @@ if __name__ == "__main__":
                 gr.Textbox(label="Inputs", lines=10),
                 gr.Textbox(label="Stop work"),
                 gr.Number(512, label="Max tokens"),
+                gr.Number(-1, label="Seed"),
                 ],
-        outputs=[gr.Textbox(label="Outputs", lines=30)],
+        outputs=[gr.Textbox(label="Outputs", lines=30), gr.Label(label="Stats")],
+
     )
 
     demo.launch(server_name="127.0.0.1", server_port=49288)
