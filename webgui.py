@@ -52,6 +52,7 @@ if __name__ == "__main__":
     demo = gr.Interface(
         allow_flagging='never',
         fn=query,
+        analytics_enabled=False,
         inputs=[gr.Textbox(label="Url", value="http://127.0.0.1:8080"),
                 gr.Textbox(label="Pre Prompt", lines=5),
                 gr.Textbox(label="Inputs", lines=10),
