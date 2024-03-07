@@ -56,7 +56,7 @@ if __name__ == "__main__":
         inputs=[gr.Textbox(label="Url", value="http://127.0.0.1:8080"),
                 gr.Textbox(label="Pre Prompt", lines=5),
                 gr.Textbox(label="Inputs", lines=10),
-                gr.Textbox(label="Stop work"),
+                gr.Textbox(label="Stop word"),
                 gr.Number(512, label="Max tokens"),
                 gr.Number(-1, label="Seed"),
                 ],
