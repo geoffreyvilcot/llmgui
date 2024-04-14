@@ -99,6 +99,7 @@ if __name__ == "__main__":
 # Llama is honest, answer with exactitude and precision."""
 
     gr.ChatInterface(query,
+                     analytics_enabled=False,
                      additional_inputs=[
                          # gr.Textbox(label="Url", value=conf.external_llama_cpp_url),
                          gr.Textbox(label="Pre Prompt", lines=5, value=pre_prompt),
