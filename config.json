@@ -1,9 +1,11 @@
 {
-  "external_llama_cpp_url" : "http://192.168.50.192:8080",
+  "external_llama_cpp_url" : "http://127.0.0.1:8080",
   "external_llama_cpp_api_key": "",
-  "prompt_template": "prompt_default.txt",
-  "user_name" : "User",
-  "bot_name" : "Llama",
+  "system_prompt": "system_prompt.txt",
+  "user_header": "user_header.txt",
+  "assistant_header": "assistant_header.txt",
+  "user_name" : "user",
+  "bot_name" : "assistant",
   "listen_bind": "127.0.0.1",
   "listen_port": 7861
 }

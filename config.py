@@ -5,7 +5,10 @@ class Config(object):
         with open(conf_file, "rt", encoding="utf8") as f :
             jconf = json.load(f)
 
-        self.prompt_template = jconf['prompt_template']
+        self.system_prompt = jconf['system_prompt']
+        self.user_header = jconf['user_header']
+        self.assistant_header = jconf['assistant_header']
+
         self.user_name = jconf['user_name']
         self.bot_name = jconf['bot_name']
 
