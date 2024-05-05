@@ -22,6 +22,10 @@ class Config(object):
         else:
             self.listen_port = 49283
 
+        self.root_path = None
+        if "root_path" in jconf :
+            self.root_path = jconf['root_path']
+
         if "external_llama_cpp_url" in jconf and len(jconf['external_llama_cpp_url']) > 5:
             self.external_llama_cpp_url = jconf['external_llama_cpp_url']
         else :

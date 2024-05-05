@@ -130,4 +130,4 @@ if __name__ == "__main__":
                          gr.Number(512, label="Max tokens"),
                          gr.Number(-1, label="Seed"),
                      ]
-                     ).launch(server_name=conf.listen_bind, server_port=conf.listen_port)
+                     ).launch(server_name=conf.listen_bind, server_port=conf.listen_port, root_path=conf.root_path)
