@@ -27,24 +27,34 @@ def query(url, preprompt, Inputs, stop_word : str, max_tokens, seed):
 
     start_t = time.time()
     api_url = f"{url}/completion"
-    in_data = {"prompt": prompt, "n_predict": max_tokens, "stop" : json_stop, "seed": seed}
+    in_data = {"prompt": prompt, "n_predict": max_tokens, "stop" : json_stop, "seed": seed, "stream" : True}
 
     # api_url = f"{url}/embedding"
     # in_data = {"content": prompt}
 
     headers = {"Content-Type": "application/json"}
     print(f"sending : {in_data}")
-    response = requests.post(api_url, data=json.dumps(in_data), headers=headers)
+    global_start_t = time.time()
+    response = requests.post(api_url, data=json.dumps(in_data), headers=headers, stream=True)
+    response_text = ""
+    idx = 0
+    start_t = None
+    for line in response.iter_lines():
 
-
-    print(str(response.text))
-    jstring = json.loads(response.text)
-
-    answer = jstring['content'] #.encode('utf-8',errors='ignore')
-
-    stats = f"prompt tokens per second: {jstring['timings']['prompt_per_second']} ; predicted tokens per second: {jstring['timings']['predicted_per_second']} "
-
-    return answer, stats
+        # filter out keep-alive new lines
+        if line:
+            decoded_line = line.decode('utf-8').replace("data: ", "")
+            j_str = json.loads(decoded_line)
+            if j_str['stop'] == "true":
+                print("-- STOP --")
+                return
+            if start_t is None:
+                start_t = time.time() - 1
+                prompt_duration = time.time() - global_start_t
+            response_text += j_str['content']
+            end_t = time.time()
+            idx += 1
+            yield response_text, f"Elapsed time {end_t -start_t:0.2f}s / Prompt eval {prompt_duration:0.2f} sec / {idx} tokens / {idx/(end_t -start_t):0.2f} tokens / sec"
 
 
 if __name__ == "__main__":

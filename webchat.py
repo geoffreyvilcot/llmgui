@@ -15,15 +15,16 @@ from io import BytesIO
 import requests
 from config import Config
 
-def query(message, history, preprompt, user_name : str, bot_name : str, max_tokens, seed):
+def query(message, history, systemprompt, user_header, assistant_header, user_name : str, bot_name : str, max_tokens, seed):
 
     history_str = ""
     for h in history :
-        sub = "\n".join(h)
+        # sub = "\n".join(h)
+        sub = f"{user_header}{h[0]} {assistant_header} {h[1]}"
         history_str += f"{sub}"
 
-    prompt = f"{preprompt}\n{history_str}\n{message}\n{bot_name}:"
-    # prompt = f"{history_str}\n{message}"
+    # prompt = f"{preprompt}\n{history_str}\n{message}\n{bot_name}:"
+    prompt = f"{systemprompt}\n{history_str}\n{user_header}{message} {assistant_header}"
 
     print(prompt)
 
@@ -34,7 +35,7 @@ def query(message, history, preprompt, user_name : str, bot_name : str, max_toke
     # }
     start_t = time.time()
     api_url = f"{conf.external_llama_cpp_url}/completion"
-    in_data = {"prompt": prompt, "n_predict": max_tokens, "stop" : [f"{user_name}:"], "seed": seed}
+    in_data = {"prompt": prompt, "n_predict": max_tokens, "stop" : [f"{user_name}", f"{bot_name}"], "seed": seed, "stream" : True}
     # in_data = {"prompt": prompt, "n_predict": max_tokens, "system_prompt" : system_prompt, "seed": seed}
 
     # {
@@ -48,17 +49,32 @@ def query(message, history, preprompt, user_name : str, bot_name : str, max_toke
     headers = {"Content-Type": "application/json"}
 
     print(f"sending : {in_data}")
-    response = requests.post(api_url, data=json.dumps(in_data), headers=headers)
+    response = requests.post(api_url, data=json.dumps(in_data), headers=headers, stream=True)
+    response_text = ""
+    idx = 0
+    start_t = None
+    for line in response.iter_lines():
+
+        # filter out keep-alive new lines
+        if line:
+            decoded_line = line.decode('utf-8').replace("data: ", "")
+            j_str = json.loads(decoded_line)
+            if j_str['stop'] == "true":
+                print("-- STOP --")
+                return
+            response_text += j_str['content']
+            idx += 1
+            yield response_text
 
 
-    print(str(response.text))
-    jstring = json.loads(response.text)
-
-    answer = jstring['content'] #.encode('utf-8',errors='ignore')
-
-    stats = f"prompt tokens per second: {jstring['timings']['prompt_per_second']} ; predicted tokens per second: {jstring['timings']['predicted_per_second']} "
-
-    return answer
+    # print(str(response.text))
+    # jstring = json.loads(response.text)
+    #
+    # answer = jstring['content'] #.encode('utf-8',errors='ignore')
+    #
+    # stats = f"prompt tokens per second: {jstring['timings']['prompt_per_second']} ; predicted tokens per second: {jstring['timings']['predicted_per_second']} "
+    #
+    # return answer
 
 if __name__ == "__main__":
 
@@ -91,8 +107,12 @@ if __name__ == "__main__":
             conf_file_name = arg
 
     conf = Config(conf_file=conf_file_name)
-    with open(conf.prompt_template, "r", encoding='utf-8') as f:
-        pre_prompt = f.read()
+    with open(conf.system_prompt, "r", encoding='utf-8') as f:
+        system_prompt = f.read()
+    with open(conf.user_header, "r", encoding='utf-8') as f:
+        user_header = f.read()
+    with open(conf.assistant_header, "r", encoding='utf-8') as f:
+        assistant_header = f.read()
 
 #     pre_prompt = """This is a transcript of a dialog between User and Llama.
 # Llama is a friendly chatbot with a huge knowledge.
@@ -102,10 +122,12 @@ if __name__ == "__main__":
                      analytics_enabled=False,
                      additional_inputs=[
                          # gr.Textbox(label="Url", value=conf.external_llama_cpp_url),
-                         gr.Textbox(label="Pre Prompt", lines=5, value=pre_prompt),
+                         gr.Textbox(label="System Prompt", lines=5, value=system_prompt),
+                         gr.Textbox(label="user_header", lines=5, value=user_header),
+                         gr.Textbox(label="assistant_header", lines=5, value=assistant_header),
                          gr.Textbox(label="User name", value=conf.user_name),
                          gr.Textbox(label="Bot name", value=conf.bot_name),
                          gr.Number(512, label="Max tokens"),
                          gr.Number(-1, label="Seed"),
                      ]
-                     ).launch(server_name=conf.listen_bind, server_port=conf.listen_port)
+                     ).launch(server_name=conf.listen_bind, server_port=conf.listen_port, root_path=conf.root_path)

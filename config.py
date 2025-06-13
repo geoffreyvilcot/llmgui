@@ -5,7 +5,10 @@ class Config(object):
         with open(conf_file, "rt", encoding="utf8") as f :
             jconf = json.load(f)
 
-        self.prompt_template = jconf['prompt_template']
+        self.system_prompt = jconf['system_prompt']
+        self.user_header = jconf['user_header']
+        self.assistant_header = jconf['assistant_header']
+
         self.user_name = jconf['user_name']
         self.bot_name = jconf['bot_name']
 
@@ -18,6 +21,10 @@ class Config(object):
             self.listen_port = int(jconf['listen_port'])
         else:
             self.listen_port = 49283
+
+        self.root_path = None
+        if "root_path" in jconf :
+            self.root_path = jconf['root_path']
 
         if "external_llama_cpp_url" in jconf and len(jconf['external_llama_cpp_url']) > 5:
             self.external_llama_cpp_url = jconf['external_llama_cpp_url']
