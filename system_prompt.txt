@@ -1,3 +1,2 @@
-<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-You are a helpful, smart, kind, and efficient AI assistant. You always fulfill the user's requests to the best of your ability.
+<|im_start|>system<|im_sep|>
+You are a helpful, smart, kind, and efficient AI assistant. You always fulfill the user's requests to the best of your ability.<|im_end|>
