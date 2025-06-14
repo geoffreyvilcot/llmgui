@@ -15,6 +15,24 @@ from io import BytesIO
 import requests
 from config import Config
 
+import re
+
+def supprimer_entre_balises(texte):
+    # print(f"texte : {texte}")
+    result = re.sub(r'\|think\|.*?\|/think\|', '', texte, flags=re.DOTALL)
+    # print(f"result : {result}\n-----\n")
+    return result
+
+def supprimer_lignes_boxed(texte):
+    """
+    Supprime les lignes qui commencent par '\boxed{'.
+    """
+    result = re.sub(r'^\\boxed\{.*$', '', texte, flags=re.MULTILINE)
+    # print(f"result : {result}\n-----\n")
+    return result
+
+supprimer_lignes_boxed("bla bla\n\\boxeed{coucou}\n\\boxed{coucou2}\n\\boxed{coucou3}\nfin bla bla")
+
 def query(message, history, systemprompt, user_header, assistant_header, user_name : str, bot_name : str, max_tokens, seed, temp, top_p):
 
     # history_str = ""
@@ -26,8 +44,11 @@ def query(message, history, systemprompt, user_header, assistant_header, user_na
     messages.append({"role": "system", "content": systemprompt})
     for m in history :
         messages.append({"role": "user", "content": m[0]} )
-        messages.append({"role": "assistant", "content": m[1]})
+        history_response_filtered = supprimer_entre_balises(m[1])
+        messages.append({"role": "assistant", "content": history_response_filtered})
     messages.append({"role": "user", "content": message})
+
+    # print(f"messages : {messages}")
 
     headers = {"Content-Type": "application/json"}
     in_data = {"messages": messages}
@@ -37,16 +58,14 @@ def query(message, history, systemprompt, user_header, assistant_header, user_na
     prompt = json.loads(response.content)["prompt"]
 #    prompt = f"{systemprompt}\n{history_str}\n{user_header}{message} {assistant_header}"
 
-    
-
-    print(prompt)
+    # print(prompt)
 
     start_t = time.time()
     api_url = f"{conf.external_llama_cpp_url}/completion"
     in_data = {"prompt": prompt, "n_predict": max_tokens, "seed": seed, "stream" : True, "temperature" : temp, "top_p" : top_p}
 
 
-    print(f"sending : {in_data}")
+    # print(f"sending : {in_data}")
     response = requests.post(api_url, data=json.dumps(in_data), headers=headers, stream=True)
     response_text = ""
     # response_text = "--\n"
@@ -59,10 +78,13 @@ def query(message, history, systemprompt, user_header, assistant_header, user_na
             if j_str['stop'] == "true":
                 print("-- STOP --")
                 return
-            response_text += j_str['content'].replace('>', '\\>').replace('<', '\\<')
-            print(response_text)
+            response_text += j_str['content'].replace('>', '|').replace('<', '|')
+            # print(response_text)
             idx += 1
+            
             yield response_text
+    
+    yield supprimer_lignes_boxed(response_text)
 
 
 
