@@ -56,19 +56,22 @@ async def run_agent(message, history, systemprompt, max_tokens, seed, temp, top_
     messages.append({"role": "system", "content": systemprompt})
     messages = messages + history
 
-    llm_response = call_llm_api(messages, max_tokens, seed, temp, top_p)    
-    data, text = extract_json_objects(llm_response)
+    start_url = "http://localhost:3000/"
 
-    if data :
-        if data['arguments']['action'] == 'visit_url':
-            start_url = data['arguments']['url']
-            print(f"[INFO] visiting {start_url}")
-        else :
-            print("[ERROR] no visit_url action found, using default start_url")
-            return("Error: no visit_url action found in LLM response.")
-    else :
-        print("[ERROR] no JSON found between <tool_call> tags.")
-        return("Parse error: No JSON found between <tool_call> tags.")
+    # messages.append({"role": "user", "content": message})
+    # llm_response = call_llm_api(messages, max_tokens, seed, temp, top_p)    
+    # data, text = extract_json_objects(llm_response)
+
+    # if data :
+    #     if data['arguments']['action'] == 'visit_url':
+    #         start_url = data['arguments']['url']
+    #         print(f"[INFO] visiting {start_url}")
+    #     else :
+    #         print("[ERROR] no visit_url action found, using default start_url")
+    #         return("Error: no visit_url action found in LLM response.")
+    # else :
+    #     print("[ERROR] no JSON found between <tool_call> tags.")
+    #     return("Parse error: No JSON found between <tool_call> tags.")
 
 
     async with async_playwright() as p:
@@ -77,11 +80,10 @@ async def run_agent(message, history, systemprompt, max_tokens, seed, temp, top_
         page = await context.new_page()
         await page.goto(start_url, wait_until='domcontentloaded')
 
-        for step_idx in range(5):  # limite nombre d'étapes pour éviter boucles infinies
+        for step_idx in range(1):  # limite nombre d'étapes pour éviter boucles infinies
             # 1) récupérer le contenu & screenshot
             page_text = await page.content()
-            screenshot = await page.screenshot()  # bytes
-
+            screenshot = await page.screenshot(scale = "device")  # bytes
 
             # include a short base64 preview if available (truncated)
             message += f"{page_text[:4000]}\n\n"
@@ -126,6 +128,7 @@ async def run_agent(message, history, systemprompt, max_tokens, seed, temp, top_
             #     print("[INFO] aucune action — fin du script")
             #     break
 
+        time.sleep(5)
         await browser.close()
 
 def call_llm_api(messages, max_tokens, seed, temp, top_p):
@@ -139,8 +142,10 @@ def call_llm_api(messages, max_tokens, seed, temp, top_p):
     start_t = time.time()
     api_url = f"{conf.external_llama_cpp_url}/completion"
     in_data = {"prompt": prompt, "n_predict": max_tokens, "seed": seed, "stream" : False, "temperature" : temp, "top_p" : top_p}
-    print(f"sending to LLM API: {in_data}")
+    # print(f"sending to LLM API: {in_data}")
     response = requests.post(api_url, data=json.dumps(in_data), headers=headers, stream=False)
+
+    print(response)
     
     print(json.loads(response.text)['content'])
     return(json.loads(response.text)['content'])
