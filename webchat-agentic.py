@@ -18,6 +18,8 @@ import base64
 import re
 import asyncio
 from playwright.async_api import async_playwright
+from playwright.sync_api import sync_playwright
+
 
 def supprimer_entre_balises(texte):
     # print(f"texte : {texte}")
@@ -33,7 +35,7 @@ def supprimer_lignes_boxed(texte):
     # print(f"result : {result}\n-----\n")
     return result
 
-def extract_json_objects(llm_response):
+def extract_json_objects_fara(llm_response):
     # Regex to capture the JSON object between <tool_call> tags
     
     match = re.search(r'<tool_call>\s*(\{.*?\})\s*</tool_call>', llm_response, re.DOTALL)
@@ -45,91 +47,123 @@ def extract_json_objects(llm_response):
     else:
         return None, llm_response.split('<tool_call>')[0]
 
-async def action_type(page, coordinate, text, press_enter=False):
-    await page.mouse.click(coordinate[0], coordinate[1])
-    await page.keyboard.type(text)
-    if press_enter:
-        await page.keyboard.press("Enter")
+def extract_json_objects_mistral(llm_response):
+    # Regex to capture the JSON object between <tool_call> tags
+    # llm_response = llm_response.replace('"name":', '"action":')
+    match = re.search(r'<tool_call>\s*(\{.*?\})\s*</tool_call>', llm_response, re.DOTALL)
+    if match:
+        json_str = match.group(1)
+        data = json.loads(json_str)
+        # data['arguments'] = {"action": data['action']}
+        print("Extracted JSON:", data)
+        return data, llm_response.split('<tool_call>')[0]
+    else:
+        return None, llm_response.split('<tool_call>')[0]
 
-async def run_agent(message, history, systemprompt, max_tokens, seed, temp, top_p):
+def action_type(page, coordinate, text, press_enter=False):
+    page.mouse.click(coordinate[0], coordinate[1])
+    page.keyboard.type(text)
+    if press_enter:
+        page.keyboard.press("Enter")
+ 
+def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
+    gradio_response = ""
     messages = []
     messages.append({"role": "system", "content": systemprompt})
     messages = messages + history
 
-    start_url = "http://localhost:3000/"
+    start_url = "https://www.bing.com/"
 
-    # messages.append({"role": "user", "content": message})
-    # llm_response = call_llm_api(messages, max_tokens, seed, temp, top_p)    
-    # data, text = extract_json_objects(llm_response)
+    messages.append({"role": "user", "content": message})
+    llm_response = call_llm_api(messages, max_tokens, seed, temp, top_p)    
+    data, text = extract_json_objects_fara(llm_response)
 
-    # if data :
-    #     if data['arguments']['action'] == 'visit_url':
-    #         start_url = data['arguments']['url']
-    #         print(f"[INFO] visiting {start_url}")
-    #     else :
-    #         print("[ERROR] no visit_url action found, using default start_url")
-    #         return("Error: no visit_url action found in LLM response.")
-    # else :
-    #     print("[ERROR] no JSON found between <tool_call> tags.")
-    #     return("Parse error: No JSON found between <tool_call> tags.")
+    gradio_response += text
+    yield gradio_response
 
+    if data :
+        if data['arguments']['action'] == 'visit_url':
+            start_url = data['arguments']['url']
+            if not start_url.startswith("http"):
+                start_url = "https://" + start_url
+            print(f"[INFO] visiting {start_url}")
+        else :
+            print("[ERROR] no visit_url action found, using default start_url")
+            return("Error: no visit_url action found in LLM response.")
+    else :
+        print("[ERROR] no JSON found between <tool_call> tags.")
+        return("Parse error: No JSON found between <tool_call> tags.")
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)  # headless=True si tu veux sans UI
-        context = await browser.new_context()
-        page = await context.new_page()
-        await page.goto(start_url, wait_until='domcontentloaded')
+    messages.append({"role": "assistant", "content": llm_response})
 
-        for step_idx in range(1):  # limite nombre d'étapes pour éviter boucles infinies
-            # 1) récupérer le contenu & screenshot
-            page_text = await page.content()
-            screenshot = await page.screenshot(scale = "device")  # bytes
+    # browser = p.chromium.launch(headless=False)  # headless=True si tu veux sans UI
+    # context = browser.new_context()
+    # page = context.new_page()
+    p, browser, page = init_agent()
+    page.goto(start_url, wait_until='domcontentloaded')
 
-            # include a short base64 preview if available (truncated)
-            message += f"{page_text[:4000]}\n\n"
-            b64 = base64.b64encode(screenshot).decode()
-            message += f"Screenshot (base64, truncated): {b64[:2000]}\n\n"
-            messages.append({"role": "user", "content": message})
-            llm_response = call_llm_api(messages, max_tokens, seed, temp, top_p)       
-            
-            # Regex to capture the JSON object between <tool_call> tags
-            data, text = extract_json_objects(llm_response)
-            
-            if data:
-                if data['arguments']['action'] == 'type':
-                    coord = data['arguments']['coordinate']
-                    text = data['arguments']['text']
-                    press_enter = data['arguments'].get('press_enter', False)
-                    await action_type(page, coord, text, press_enter)
-                    print(f"[INFO] typed '{text}' at {coord}")
-            else:
-                return("Parse error: No JSON found between <tool_call> tags.")
+    for step_idx in range(3):  # limite nombre d'étapes pour éviter boucles infinies
+        # time.sleep(2)  # attendre que la page charge
+        # 1) récupérer le contenu & screenshot
+        page_text = page.content()
+        screenshot = page.screenshot(scale = "device")  # bytes
 
-            # # 3) exécuter l’action
-            # act = decision.get("action")
-            # if act == "click":
-            #     sel = decision.get("selector")
-            #     try:
-            #         await page.click(sel, timeout=5000)
-            #         print(f"[INFO] clic sur {sel}")
-            #     except Exception as e:
-            #         print("[ERROR] clic a échoué:", e)
-            #         break
-            # elif act == "type":
-            #     sel = decision.get("selector")
-            #     value = decision.get("value", "")
-            #     await page.fill(sel, value)
-            #     print(f"[INFO] rempli {sel} avec '{value}'")
-            # elif act == "goto":
-            #     url = decision.get("url")
-            #     await page.goto(url, wait_until='domcontentloaded')
-            #     print(f"[INFO] navigation vers {url}")
-            # else:
-            #     print("[INFO] aucune action — fin du script")
-            #     break
+        # include a short base64 preview if available (truncated)
+        message = f"{page_text[:4000]}\n\n"
+        b64 = base64.b64encode(screenshot).decode()
+        message += f"Screenshot (base64, truncated): {b64[:2000]}\n\n"
+        messages.append({"role": "user", "content": message})
+        llm_response = call_llm_api(messages, max_tokens, seed, temp, top_p)       
+        
+        # Regex to capture the JSON object between <tool_call> tags
+        data, text = extract_json_objects_fara(llm_response)
+        gradio_response += text
+        yield gradio_response
 
-        time.sleep(5)
-        await browser.close()
+        if data:
+            if data['arguments']['action'] == 'type':
+                coord = data['arguments']['coordinate']
+                text = data['arguments']['text']
+                press_enter = data.get('press_enter', False)
+                action_type(page, coord, text, press_enter)
+                print(f"[INFO] typed '{text}' at {coord}")
+            if data['arguments']['action'] == 'scroll':
+                direction = data['arguments']['direction']
+                if direction == 'down':
+                    page.keyboard.press("PageDown")
+                elif direction == 'up':
+                    page.keyboard.press("PageUp")
+                print(f"[INFO] scrolled {direction}")
+
+        else:
+            return("Parse error: No JSON found between <tool_call> tags.")
+
+        # # 3) exécuter l’action
+        # act = decision.get("action")
+        # if act == "click":
+        #     sel = decision.get("selector")
+        #     try:
+        #         await page.click(sel, timeout=5000)
+        #         print(f"[INFO] clic sur {sel}")
+        #     except Exception as e:
+        #         print("[ERROR] clic a échoué:", e)
+        #         break
+        # elif act == "type":
+        #     sel = decision.get("selector")
+        #     value = decision.get("value", "")
+        #     await page.fill(sel, value)
+        #     print(f"[INFO] rempli {sel} avec '{value}'")
+        # elif act == "goto":
+        #     url = decision.get("url")
+        #     await page.goto(url, wait_until='domcontentloaded')
+        #     print(f"[INFO] navigation vers {url}")
+        # else:
+        #     print("[INFO] aucune action — fin du script")
+        #     break
+
+ 
+        # browser.close()
+    return gradio_response
 
 def call_llm_api(messages, max_tokens, seed, temp, top_p):
     headers = {"Content-Type": "application/json"}
@@ -150,7 +184,7 @@ def call_llm_api(messages, max_tokens, seed, temp, top_p):
     print(json.loads(response.text)['content'])
     return(json.loads(response.text)['content'])
 
-def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
+def query_old(message, history, systemprompt, max_tokens, seed, temp, top_p):
 
     # if screenshot_bytes:
     #     # include a short base64 preview if available (truncated)
@@ -165,11 +199,11 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
 
     response_text = ""
     # response_text = "--\n"
-    response_text = asyncio.run(run_agent(message, history, systemprompt, max_tokens, seed, temp, top_p))
+    response_text = run_agent(message, history, systemprompt, max_tokens, seed, temp, top_p)
     return response_text
 
 def init_agent():
-    p =  async_playwright() 
+    p =  sync_playwright().start() 
     browser = p.chromium.launch(headless=False)
     context = browser.new_context()
     page = context.new_page()
@@ -224,9 +258,6 @@ if __name__ == "__main__":
 
     # p, browser, page = init_agent()
 
-    # page.goto("https://www.example.com")
-    # content = page.content()
-    # print(content)
     # browser.close()
 
     gr.ChatInterface(query,
