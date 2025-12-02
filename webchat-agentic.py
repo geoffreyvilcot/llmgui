@@ -103,7 +103,7 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
     page.goto(start_url, wait_until='domcontentloaded')
 
     for step_idx in range(3):  # limite nombre d'étapes pour éviter boucles infinies
-        # time.sleep(2)  # attendre que la page charge
+        time.sleep(2)  # attendre que la page charge
         # 1) récupérer le contenu & screenshot
         page_text = page.content()
         screenshot = page.screenshot(scale = "device")  # bytes
@@ -111,7 +111,7 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
         # include a short base64 preview if available (truncated)
         message = f"{page_text[:4000]}\n\n"
         b64 = base64.b64encode(screenshot).decode()
-        message += f"Screenshot (base64, truncated): {b64[:2000]}\n\n"
+        # message += f"Screenshot (base64, truncated): {b64[:2000]}\n\n"
         messages.append({"role": "user", "content": message})
         llm_response = call_llm_api(messages, max_tokens, seed, temp, top_p)       
         

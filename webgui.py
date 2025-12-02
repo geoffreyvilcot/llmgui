@@ -60,7 +60,6 @@ def query(url, preprompt, Inputs, stop_word : str, max_tokens, seed):
 if __name__ == "__main__":
 
     demo = gr.Interface(
-        allow_flagging='never',
         fn=query,
         analytics_enabled=False,
         inputs=[gr.Textbox(label="Url", value="http://127.0.0.1:8080"),
