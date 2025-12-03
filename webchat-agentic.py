@@ -20,6 +20,7 @@ import asyncio
 from playwright.async_api import async_playwright
 from playwright.sync_api import sync_playwright
 
+playwright_browser = None
 
 def supprimer_entre_balises(texte):
     # print(f"texte : {texte}")
@@ -72,33 +73,34 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p, max_ite
     messages.append({"role": "system", "content": systemprompt})
     messages = messages + history
 
-    start_url = "https://www.bing.com/"
+    start_url = "http://localhost:3000/"
 
-    messages.append({"role": "user", "content": message})
-    llm_response = call_llm_api_v1(messages, max_tokens, seed, temp, top_p)    
-    data, text = extract_json_objects_fara(llm_response)
+    # messages.append({"role": "user", "content": message})
+    # llm_response = call_llm_api_v1(messages, max_tokens, seed, temp, top_p)    
+    # data, text = extract_json_objects_fara(llm_response)
 
-    gradio_response += text
-    yield gradio_response
+    # gradio_response += text
+    # yield gradio_response
 
-    if data :
-        if data['arguments']['action'] == 'visit_url':
-            start_url = data['arguments']['url']
-            if not start_url.startswith("http"):
-                start_url = "https://" + start_url
-            print(f"[INFO] visiting {start_url}")
-        else :
-            print("[ERROR] no visit_url action found, using default start_url")
-            return("Error: no visit_url action found in LLM response.")
-    else :
-        print("[ERROR] no JSON found between <tool_call> tags.")
-        return("Parse error: No JSON found between <tool_call> tags.")
+    # if data :
+    #     if data['arguments']['action'] == 'visit_url':
+    #         start_url = data['arguments']['url']
+    #         if not start_url.startswith("http"):
+    #             start_url = "https://" + start_url
+    #         print(f"[INFO] visiting {start_url}")
+    #     else :
+    #         print("[ERROR] no visit_url action found, using default start_url")
+    #         return("Error: no visit_url action found in LLM response.")
+    # else :
+    #     print("[ERROR] no JSON found between <tool_call> tags.")
+    #     return("Parse error: No JSON found between <tool_call> tags.")
 
-    messages.append({"role": "assistant", "content": llm_response})
+    # messages.append({"role": "assistant", "content": llm_response})
+    user_content = [{"type": "text", "text": message}]
+    messages.append({"role": "user", "content": user_content})
 
-    # browser = p.chromium.launch(headless=False)  # headless=True si tu veux sans UI
-    # context = browser.new_context()
-    # page = context.new_page()
+    llm_response = call_llm_api_v1(messages, max_tokens, seed, temp, top_p)   
+
     p, browser, page = init_agent()
     page.goto(start_url, wait_until='domcontentloaded')
 
@@ -195,30 +197,15 @@ def call_llm_api_v1(messages, max_tokens, seed, temp, top_p):
     print(msg_response)
     return(msg_response['content'])
 
-def query_old(message, history, systemprompt, max_tokens, seed, temp, top_p):
-
-    # if screenshot_bytes:
-    #     # include a short base64 preview if available (truncated)
-    #     b64 = base64.b64encode(screenshot_bytes).decode()
-    #     message += f"Screenshot (base64, truncated): {b64[:2000]}\n\n"
-
-    # messages = []
-    # messages.append({"role": "system", "content": systemprompt})
-    # messages = messages + history
-    # messages.append({"role": "user", "content": message})
-    # call_llm_api(messages, max_tokens, seed, temp, top_p)
-
-    response_text = ""
-    # response_text = "--\n"
-    response_text = run_agent(message, history, systemprompt, max_tokens, seed, temp, top_p)
-    return response_text
 
 def init_agent():
-    p =  sync_playwright().start() 
-    browser = p.chromium.launch(headless=False)
+    global playwright_browser
+    if not playwright_browser :
+        playwright_browser =  sync_playwright().start() 
+    browser = playwright_browser.chromium.launch(headless=False)
     context = browser.new_context()
     page = context.new_page()
-    return p, browser, page
+    return playwright_browser, browser, page
     # await page.goto("https://www.example.com")
     # content = await page.content()
     # print(content)
@@ -251,6 +238,7 @@ if __name__ == "__main__":
     # r = call_llm_api_v1(messages, 2048, -1, 0.7, 0.95)
     # print(r)
 
+    # p, browser, page = init_agent()
 
     gr.ChatInterface(query,
                      analytics_enabled=False,
@@ -260,7 +248,7 @@ if __name__ == "__main__":
                          gr.Number(-1, label="Seed"),
                          gr.Number(0.7, label="temp"),
                          gr.Number(0.95, label="top_p"),
-                         gr.Number(4, label="Max iteration"),
+                         gr.Number(10, label="Max iteration"),
                      ]
                      ).launch(server_name=conf.listen_bind, server_port=conf.listen_port, root_path=conf.root_path)
 
