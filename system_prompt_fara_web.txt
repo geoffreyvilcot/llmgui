@@ -68,5 +68,5 @@ For each function call, return a JSON object with the function name and argument
 
 ```
 
-- Function signatures provided for all actions (`key`, `type`, `mouse_move`, `left_click`, `scroll`, `visit_url`, `web_search`, `history_back`, `pause_and_memorize_fact`, `wait`, `terminate`).  
+- Function signatures provided for all actions (`key`, `type`, `mouse_move`, `left_click`, `scroll`, `visit_url`, `pause_and_memorize_fact`, `wait`, `terminate`).  
 

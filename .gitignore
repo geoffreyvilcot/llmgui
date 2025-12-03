@@ -127,6 +127,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+venv-llmgui
 
 # Spyder project settings
 .spyderproject

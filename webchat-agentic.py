@@ -75,7 +75,7 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
     start_url = "https://www.bing.com/"
 
     messages.append({"role": "user", "content": message})
-    llm_response = call_llm_api(messages, max_tokens, seed, temp, top_p)    
+    llm_response = call_llm_api_v1(messages, max_tokens, seed, temp, top_p)    
     data, text = extract_json_objects_fara(llm_response)
 
     gradio_response += text
@@ -106,14 +106,20 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
         time.sleep(2)  # attendre que la page charge
         # 1) récupérer le contenu & screenshot
         page_text = page.content()
-        screenshot = page.screenshot(scale = "device")  # bytes
+        screenshot = page.screenshot(scale = "css")  # bytes
 
         # include a short base64 preview if available (truncated)
         message = f"{page_text[:4000]}\n\n"
         b64 = base64.b64encode(screenshot).decode()
         # message += f"Screenshot (base64, truncated): {b64[:2000]}\n\n"
-        messages.append({"role": "user", "content": message})
-        llm_response = call_llm_api(messages, max_tokens, seed, temp, top_p)       
+        # messages.append({"role": "user", "content": message})
+        user_content = [{"type": "text", "text": message}]
+        if b64: 
+            user_content += [{"type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"}}]
+        messages.append({"role": "user", "content": user_content})
+
+        llm_response = call_llm_api_v1(messages, max_tokens, seed, temp, top_p)       
         
         # Regex to capture the JSON object between <tool_call> tags
         data, text = extract_json_objects_fara(llm_response)
@@ -121,12 +127,20 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
         yield gradio_response
 
         if data:
+            if data['arguments']['action'] == 'terminate':
+                print("[INFO] terminating agent as per LLM instruction.")
+                gradio_response += "\nAgent terminated as per LLM instruction."
+                return gradio_response
             if data['arguments']['action'] == 'type':
                 coord = data['arguments']['coordinate']
                 text = data['arguments']['text']
-                press_enter = data.get('press_enter', False)
+                press_enter = data['arguments']['press_enter']
+                print(f"[INFO] typing '{text}' at {coord}, press_enter={press_enter}")
                 action_type(page, coord, text, press_enter)
-                print(f"[INFO] typed '{text}' at {coord}")
+            if data['arguments']['action'] == 'left_click':
+                coord = data['arguments']['coordinate']
+                page.mouse.click(coord[0], coord[1])
+                print(f"[INFO] left clicked at {coord}")
             if data['arguments']['action'] == 'scroll':
                 direction = data['arguments']['direction']
                 if direction == 'down':
@@ -138,31 +152,10 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
         else:
             return("Parse error: No JSON found between <tool_call> tags.")
 
-        # # 3) exécuter l’action
-        # act = decision.get("action")
-        # if act == "click":
-        #     sel = decision.get("selector")
-        #     try:
-        #         await page.click(sel, timeout=5000)
-        #         print(f"[INFO] clic sur {sel}")
-        #     except Exception as e:
-        #         print("[ERROR] clic a échoué:", e)
-        #         break
-        # elif act == "type":
-        #     sel = decision.get("selector")
-        #     value = decision.get("value", "")
-        #     await page.fill(sel, value)
-        #     print(f"[INFO] rempli {sel} avec '{value}'")
-        # elif act == "goto":
-        #     url = decision.get("url")
-        #     await page.goto(url, wait_until='domcontentloaded')
-        #     print(f"[INFO] navigation vers {url}")
-        # else:
-        #     print("[INFO] aucune action — fin du script")
-        #     break
-
  
         # browser.close()
+    print("[INFO] fin des étapes de l'agent.")
+    gradio_response += "\nfin des étapes de l'agent."
     return gradio_response
 
 def call_llm_api(messages, max_tokens, seed, temp, top_p):
@@ -183,6 +176,22 @@ def call_llm_api(messages, max_tokens, seed, temp, top_p):
     
     print(json.loads(response.text)['content'])
     return(json.loads(response.text)['content'])
+
+def call_llm_api_v1(messages, max_tokens, seed, temp, top_p):
+
+    start_t = time.time()
+    api_url = f"{conf.external_llama_cpp_url}/v1/chat/completions"
+    # in_data = {"prompt": prompt, "n_predict": max_tokens, "seed": seed, "stream" : False, "temperature" : temp, "top_p" : top_p}
+
+    in_data = {"model": "ministral", "messages": messages, "n_predict": max_tokens, "seed": seed, "stream" : False, "temperature" : temp, "top_p" : top_p}
+    # print(f"sending to LLM API: {in_data}")
+    response = requests.post(api_url, data=json.dumps(in_data), stream=False)
+
+    print(response)
+    
+    msg_response = json.loads(response.text)['choices'][0]['message']
+    print(msg_response)
+    return(msg_response['content'])
 
 def query_old(message, history, systemprompt, max_tokens, seed, temp, top_p):
 
@@ -216,24 +225,6 @@ def init_agent():
 
 if __name__ == "__main__":
 
-    # demo = gr.Interface(
-    #     allow_flagging='never',
-    #     fn=query,
-    #     analytics_enabled=False,
-    #     inputs=[gr.Textbox(label="Url", value="http://127.0.0.1:8080"),
-    #             gr.Textbox(label="Pre Prompt", lines=5),
-    #             gr.Textbox(label="Inputs", lines=10),
-    #             gr.Textbox(label="Stop word"),
-    #             gr.Number(512, label="Max tokens"),
-    #             gr.Number(-1, label="Seed"),
-    #             ],
-    #     outputs=[gr.Textbox(label="Outputs", lines=30), gr.Label(label="Stats")],
-    #
-    # )
-
-    # demo.launch(server_name="127.0.0.1", server_port=49288)
-    # auth=("admin", "pass1234")
-
     conf_file_name = "config_fara.json"
 
     opts, args = getopt.getopt(sys.argv[1:],"hc:")
@@ -251,14 +242,13 @@ if __name__ == "__main__":
         user_header = f.read()
     with open(conf.assistant_header, "r", encoding='utf-8') as f:
         assistant_header = f.read()
+    
+    messages = []
+    messages.append({"role": "system", "content": "You are an assistant that helps users to plan their trips in France."})
+    messages.append({"role": "user", "content": "Bonjour, Calcul un itinéraire entre Tours et Orléans"})
+    # r = call_llm_api_v1(messages, 2048, -1, 0.7, 0.95)
+    # print(r)
 
-#     pre_prompt = """This is a transcript of a dialog between User and Llama.
-# Llama is a friendly chatbot with a huge knowledge.
-# Llama is honest, answer with exactitude and precision."""
-
-    # p, browser, page = init_agent()
-
-    # browser.close()
 
     gr.ChatInterface(query,
                      analytics_enabled=False,
@@ -270,3 +260,4 @@ if __name__ == "__main__":
                          gr.Number(0.95, label="top_p"),
                      ]
                      ).launch(server_name=conf.listen_bind, server_port=conf.listen_port, root_path=conf.root_path)
+
