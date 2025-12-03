@@ -66,7 +66,7 @@ def action_type(page, coordinate, text, press_enter=False):
     if press_enter:
         page.keyboard.press("Enter")
  
-def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
+def query(message, history, systemprompt, max_tokens, seed, temp, top_p, max_iteration):
     gradio_response = ""
     messages = []
     messages.append({"role": "system", "content": systemprompt})
@@ -102,7 +102,7 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
     p, browser, page = init_agent()
     page.goto(start_url, wait_until='domcontentloaded')
 
-    for step_idx in range(3):  # limite nombre d'étapes pour éviter boucles infinies
+    for step_idx in range(max_iteration):  # limite nombre d'étapes pour éviter boucles infinies
         time.sleep(2)  # attendre que la page charge
         # 1) récupérer le contenu & screenshot
         page_text = page.content()
@@ -130,6 +130,7 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
             if data['arguments']['action'] == 'terminate':
                 print("[INFO] terminating agent as per LLM instruction.")
                 gradio_response += "\nAgent terminated as per LLM instruction."
+                yield gradio_response
                 return gradio_response
             if data['arguments']['action'] == 'type':
                 coord = data['arguments']['coordinate']
@@ -156,6 +157,7 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p):
         # browser.close()
     print("[INFO] fin des étapes de l'agent.")
     gradio_response += "\nfin des étapes de l'agent."
+    yield gradio_response
     return gradio_response
 
 def call_llm_api(messages, max_tokens, seed, temp, top_p):
@@ -258,6 +260,7 @@ if __name__ == "__main__":
                          gr.Number(-1, label="Seed"),
                          gr.Number(0.7, label="temp"),
                          gr.Number(0.95, label="top_p"),
+                         gr.Number(4, label="Max iteration"),
                      ]
                      ).launch(server_name=conf.listen_bind, server_port=conf.listen_port, root_path=conf.root_path)
 
