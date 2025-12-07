@@ -86,28 +86,75 @@ def query(message, history, systemprompt, user_header, assistant_header, user_na
     
     yield supprimer_lignes_boxed(response_text)
 
+def query(message, history, systemprompt, stop_words, user_name : str, bot_name : str, max_tokens, seed, temp, top_p):
+    gradio_response = ""
+    system_prompt = systemprompt.replace("{{user}}", user_name).replace("{{char}}", bot_name)
+    messages = []
+    messages.append({"role": "system", "content": system_prompt})
+    messages = messages + history
 
+    user_content = [{"type": "text", "text": message}]
+    messages.append({"role": "user", "content": user_content})
+
+    print(f"\n{messages}")
+
+    start_t = time.time()
+    api_url = f"{conf.external_llama_cpp_url}/v1/chat/completions"
+    in_data = {"model": "ministral", "messages": messages, "n_predict": max_tokens, "seed": seed, "stream" : True, "temperature" : temp, "top_p" : top_p}
+    response = requests.post(api_url, data=json.dumps(in_data),  stream=True)
+    response_text = ""
+    
+    idx = 0
+    start_t = None
+    for line in response.iter_lines():
+        if line:
+            # print(line)
+            decoded_line = line.decode('utf-8').replace("data: ", "")
+            j_str = json.loads(decoded_line)
+            # if j_str['stop'] == "true":
+            #     print("-- STOP --")
+            #     return
+            if j_str['choices'][0]['finish_reason'] == "stop":
+                print("-- STOP --")
+                break
+            if j_str['choices'][0]['delta']['content'] :
+                response_text += j_str['choices'][0]['delta']['content']
+            # print(response_text)
+            idx += 1
+            
+            if stop_words is not None and stop_words in response_text:
+                response_text = response_text.replace(stop_words, "")
+                break
+
+            # yield history + [
+            #     {"role": "user", "content": message},
+            #     {"role": "assistant", "content": response_text}
+            #     ]
+            yield response_text
+    
+    # yield history + [
+    #             {"role": "user", "content": message},
+    #             {"role": "assistant", "content": response_text}
+    #             ]
+    yield response_text
+
+def call_llm_api_v1(messages, max_tokens, seed, temp, top_p):
+
+    start_t = time.time()
+    api_url = f"{conf.external_llama_cpp_url}/v1/chat/completions"
+    # in_data = {"prompt": prompt, "n_predict": max_tokens, "seed": seed, "stream" : False, "temperature" : temp, "top_p" : top_p}
+
+    in_data = {"model": "ministral", "messages": messages, "n_predict": max_tokens, "seed": seed, "stream" : False, "temperature" : temp, "top_p" : top_p}
+    # print(f"sending to LLM API: {in_data}")
+    response = requests.post(api_url, data=json.dumps(in_data), stream=False)
+
+    print(response)
+    
+    msg_response = json.loads(response.text)['choices'][0]['message']
+    print(msg_response)
+    return(msg_response['content'])
 
 if __name__ == "__main__":
-
-    # demo = gr.Interface(
-    #     allow_flagging='never',
-    #     fn=query,
-    #     analytics_enabled=False,
-    #     inputs=[gr.Textbox(label="Url", value="http://127.0.0.1:8080"),
-    #             gr.Textbox(label="Pre Prompt", lines=5),
-    #             gr.Textbox(label="Inputs", lines=10),
-    #             gr.Textbox(label="Stop word"),
-    #             gr.Number(512, label="Max tokens"),
-    #             gr.Number(-1, label="Seed"),
-    #             ],
-    #     outputs=[gr.Textbox(label="Outputs", lines=30), gr.Label(label="Stats")],
-    #
-    # )
-
-    # demo.launch(server_name="127.0.0.1", server_port=49288)
-    # auth=("admin", "pass1234")
-
     conf_file_name = "config.json"
 
     opts, args = getopt.getopt(sys.argv[1:],"hc:")
@@ -135,8 +182,7 @@ if __name__ == "__main__":
                      additional_inputs=[
                          # gr.Textbox(label="Url", value=conf.external_llama_cpp_url),
                          gr.Textbox(label="System Prompt", lines=5, value=system_prompt),
-                         gr.Textbox(label="user_header", lines=5, value=user_header),
-                         gr.Textbox(label="assistant_header", lines=5, value=assistant_header),
+                         gr.Textbox(label="stop_words", lines=1, value=conf.stop_words),
                          gr.Textbox(label="User name", value=conf.user_name),
                          gr.Textbox(label="Bot name", value=conf.bot_name),
                          gr.Number(20480, label="Max tokens"),

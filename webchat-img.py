@@ -33,6 +33,15 @@ def supprimer_lignes_boxed(texte):
     # print(f"result : {result}\n-----\n")
     return result
 
+def check_stop_words(response_text, stop_words):
+    if stop_words is None:
+        return response_text, False
+    for stop_word in stop_words:
+        index = response_text.find(stop_word)
+        if index != -1:
+            return response_text[:index], True
+    return response_text, False
+
 def query(message, history, img_path, systemprompt, max_tokens, seed, temp, top_p):
     gradio_response = ""
     messages = []
@@ -71,12 +80,6 @@ def query(message, history, img_path, systemprompt, max_tokens, seed, temp, top_
                      "image_url": {"url": f"data:image/png;base64,{img_b64}"}}]
     messages.append({"role": "user", "content": user_content})
 
-    # headers = {"Content-Type": "application/json"}
-    # in_data = {"messages": messages}
-    # api_url = f"{conf.external_llama_cpp_url}/apply-template"
-    # response = requests.post(api_url, data=json.dumps(in_data), headers=headers)
-
-    # prompt = json.loads(response.content)["prompt"]
 
     print(messages)
 
@@ -103,6 +106,10 @@ def query(message, history, img_path, systemprompt, max_tokens, seed, temp, top_
                 response_text += j_str['choices'][0]['delta']['content']
             print(response_text)
             idx += 1
+
+            response_text, must_stop = check_stop_words(response_text, conf.stop_words)
+            if must_stop:
+                break
             
             yield message, history + [
                 {"role": "user", "content": message},
@@ -116,6 +123,25 @@ def query(message, history, img_path, systemprompt, max_tokens, seed, temp, top_
                 ], \
         response_text
 
+def compile_memory(history):
+    compiled = ""
+    for msg in history:
+        # print(msg)
+        compiled += f"{msg['role'].upper()}:\n"
+        compiled += f"{msg['content'][0]['text']}\n\n"
+    print(compiled)
+    return compiled
+
+def save_memory(history):
+    with open(conf.save_file, "wb") as f:
+        pickle.dump(history, f)
+    return f"Memory saved to {conf.save_file}"
+def restore_memory():
+    if not os.path.exists(conf.save_file):
+        return [], f"No memory file found at {conf.save_file}"
+    with open(conf.save_file, "rb") as f:
+        history = pickle.load(f)
+    return history, f"Memory restored from {conf.save_file}"
 
 if __name__ == "__main__":
 
@@ -133,6 +159,8 @@ if __name__ == "__main__":
     with open(conf.system_prompt, "r", encoding='utf-8') as f:
         system_prompt = f.read()
 
+    system_prompt = system_prompt.replace("{{user}}", conf.user_name).replace("{{char}}", conf.bot_name)
+
 
     shortcut_js = """
         <script>
@@ -145,13 +173,17 @@ if __name__ == "__main__":
         document.addEventListener('keyup', shortcuts, false);
         </script>
     """
-    # with gr.Blocks(head=shortcut_js) as query_interface:
+
     with gr.Blocks() as query_interface:
         chatbot = gr.Chatbot(resizable=True)
         with gr.Row():
-            input_text = gr.Textbox(label="Input", lines=2, value="Describe the image",  placeholder="Type your message here...", scale=10)
+            input_text = gr.Textbox(label="Input", lines=2, value="",  placeholder="Type your message here...", scale=10)
             img_input = gr.Image(type="filepath", label="Input Image (optional)", scale=2)
             btn_process_text = gr.Button(value=">", elem_id="my_btn", scale=1)
+        with gr.Accordion("Advanced action", open=False) :
+            btn_compile = gr.Button(value="Compile Memory")
+            btn_save = gr.Button(value="Save Memory")
+            btn_restore = gr.Button(value="Restore Memory")
         with gr.Accordion("Advance parameters", open=False) :
             system_prompt = gr.Textbox(label="System Prompt", lines=5, value=system_prompt)
             max_tokens = gr.Number(20480, label="Max tokens")
@@ -161,6 +193,10 @@ if __name__ == "__main__":
             debug_txt =gr.Textbox(label="Debug", lines=15)        
         btn_process_text.click(query, inputs=[input_text,chatbot, img_input, system_prompt, max_tokens, seed, temp, top_p], 
                                outputs=[input_text, chatbot, debug_txt])
+        btn_compile.click(compile_memory, inputs=[chatbot], outputs=[debug_txt])
+        btn_save.click(save_memory, inputs=[chatbot], outputs=[debug_txt])
+        btn_restore.click(restore_memory, outputs=[chatbot, debug_txt])
     query_interface.analytics_enabled = False
+        
     query_interface.title = "Chat bot interface"
-    query_interface.launch(server_name=conf.listen_bind, server_port=conf.listen_port, root_path=conf.root_path)
+    query_interface.launch(server_name=conf.listen_bind, server_port=conf.listen_port, root_path=conf.root_path, head=shortcut_js)

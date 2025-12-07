@@ -1,11 +1,12 @@
 {
   "external_llama_cpp_url" : "http://127.0.0.1:8080",
   "external_llama_cpp_api_key": "",
-  "system_prompt": "ministral_prompt.txt",
+  "system_prompt": "system_prompt_mytho.md",
+  "stop_words": ["<|im_end|>", "<|im_start|>"],
   "user_header": "user_header.txt",
   "assistant_header": "assistant_header.txt",
-  "user_name" : "user",
-  "bot_name" : "assistant",
+  "user_name" : "Geo",
+  "bot_name" : "Daria",
   "listen_bind": "127.0.0.1",
   "listen_port": 7861,
   "root_path": "/llmchat"

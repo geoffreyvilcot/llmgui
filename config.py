@@ -6,11 +6,16 @@ class Config(object):
             jconf = json.load(f)
 
         self.system_prompt = jconf['system_prompt']
-        self.user_header = jconf['user_header']
-        self.assistant_header = jconf['assistant_header']
+        self.user_header = jconf['user_header'] 
+        self.assistant_header = jconf['assistant_header'] 
 
         self.user_name = jconf['user_name']
         self.bot_name = jconf['bot_name']
+
+        if 'stop_words' in jconf :
+            self.stop_words = jconf['stop_words'] 
+        else :
+            self.stop_words = None
 
         if "listen_bind" in jconf :
             self.listen_bind = jconf['listen_bind']
@@ -35,5 +40,10 @@ class Config(object):
             self.external_llama_cpp_api_key = jconf['external_llama_cpp_api_key']
         else :
             self.external_llama_cpp_api_key = None
+        
+        if "save_file" in jconf :
+            self.save_file = jconf['save_file']
+        else :
+            self.save_file = "memory.pkl"
 
 
