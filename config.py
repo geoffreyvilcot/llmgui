@@ -44,6 +44,6 @@ class Config(object):
         if "save_file" in jconf :
             self.save_file = jconf['save_file']
         else :
-            self.save_file = "memory.pkl"
+            self.save_file = "memory.crp"
 
 

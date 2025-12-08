@@ -185,16 +185,10 @@ def call_llm_api_v1(messages, max_tokens, seed, temp, top_p):
 
     start_t = time.time()
     api_url = f"{conf.external_llama_cpp_url}/v1/chat/completions"
-    # in_data = {"prompt": prompt, "n_predict": max_tokens, "seed": seed, "stream" : False, "temperature" : temp, "top_p" : top_p}
-
     in_data = {"model": "ministral", "messages": messages, "n_predict": max_tokens, "seed": seed, "stream" : False, "temperature" : temp, "top_p" : top_p}
     # print(f"sending to LLM API: {in_data}")
-    response = requests.post(api_url, data=json.dumps(in_data), stream=False)
-
-    print(response)
-    
+    response = requests.post(api_url, data=json.dumps(in_data), stream=False)    
     msg_response = json.loads(response.text)['choices'][0]['message']
-    print(msg_response)
     return(msg_response['content'])
 
 
