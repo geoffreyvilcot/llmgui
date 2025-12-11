@@ -75,29 +75,30 @@ def query(message, history, systemprompt, max_tokens, seed, temp, top_p, max_ite
 
     start_url = "http://localhost:3000/"
 
-    # messages.append({"role": "user", "content": message})
-    # llm_response = call_llm_api_v1(messages, max_tokens, seed, temp, top_p)    
-    # data, text = extract_json_objects_fara(llm_response)
+    messages.append({"role": "user", "content": message})
+    llm_response = call_llm_api_v1(messages, max_tokens, seed, temp, top_p)    
+    data, text = extract_json_objects_fara(llm_response)
 
-    # gradio_response += text
-    # yield gradio_response
+    gradio_response += text
+    yield gradio_response
 
-    # if data :
-    #     if data['arguments']['action'] == 'visit_url':
-    #         start_url = data['arguments']['url']
-    #         if not start_url.startswith("http"):
-    #             start_url = "https://" + start_url
-    #         print(f"[INFO] visiting {start_url}")
-    #     else :
-    #         print("[ERROR] no visit_url action found, using default start_url")
-    #         return("Error: no visit_url action found in LLM response.")
-    # else :
-    #     print("[ERROR] no JSON found between <tool_call> tags.")
-    #     return("Parse error: No JSON found between <tool_call> tags.")
+    if data :
+        if data['arguments']['action'] == 'visit_url':
+            start_url = data['arguments']['url']
+            if not start_url.startswith("http"):
+                start_url = "https://" + start_url
+            print(f"[INFO] visiting {start_url}")
+        else :
+            print("[ERROR] no visit_url action found, using default start_url")
+            return("Error: no visit_url action found in LLM response.")
+    else :
+        print("[ERROR] no JSON found between <tool_call> tags.")
+        return("Parse error: No JSON found between <tool_call> tags.")
 
-    # messages.append({"role": "assistant", "content": llm_response})
-    user_content = [{"type": "text", "text": message}]
-    messages.append({"role": "user", "content": user_content})
+    messages.append({"role": "assistant", "content": llm_response})
+
+    # user_content = [{"type": "text", "text": message}]
+    # messages.append({"role": "user", "content": user_content})
 
     llm_response = call_llm_api_v1(messages, max_tokens, seed, temp, top_p)   
 

@@ -55,15 +55,45 @@ def call_llm_api_v1(messages, max_tokens=1024, seed=-1, temp=0.7, top_p=0.95):
     return(msg_response['content'])
 
 
-def query(message, history, systemprompt,user_name, bot_name, max_tokens, seed, temp, top_p):
+def query(message, history, systemprompt,user_name, bot_name, img_path, max_tokens, seed, temp, top_p):
     gradio_response = ""
     systemprompt = systemprompt.replace("{{user}}", user_name).replace("{{char}}", bot_name)
+
+
+    img_b64 = None
+    if img_path:
+        try:
+            if os.path.exists(img_path):
+                try:
+                    with Image.open(img_path) as img:
+                        if img.mode not in ("RGB", "RGBA"):
+                            img = img.convert("RGB")
+                        max_size = 512
+                        w, h = img.size
+                        scale = min(max_size / w, max_size / h, 1.0)
+                        new_size = (int(w * scale), int(h * scale))
+                        # if new_size != img.size:
+                        #     img = img.resize(new_size, Image.LANCZOS)
+                        buf = BytesIO()
+                        img.save(buf, format="PNG")
+                        img_bytes = buf.getvalue()
+                    img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+
+                except Exception as e:
+                    print(f"Error processing image {img_path}: {e}")
+            else:
+                print(f"Image not found: {img_path}")
+        except Exception as e:
+            print(f"Error encoding image {img_path}: {e}")
 
     messages = []
     messages.append({"role": "system", "content": systemprompt})
     messages = messages + history
 
     user_content = [{"type": "text", "text": message}]
+    if img_b64:
+        user_content += [{"type": "image_url",
+                     "image_url": {"url": f"data:image/png;base64,{img_b64}"}}]
     messages.append({"role": "user", "content": user_content})
 
     # print(messages)
@@ -175,6 +205,7 @@ if __name__ == "__main__":
         chatbot = gr.Chatbot(resizable=True)
         with gr.Row():
             input_text = gr.Textbox(label="Input", lines=2, value="",  placeholder="Type your message here...", scale=10)
+            img_input = gr.Image(type="filepath", label="Input Image (optional)", scale=2)
             btn_process_text = gr.Button(value=">", elem_id="my_btn", scale=1)
         with gr.Accordion("Advanced action", open=False) :
             btn_compile = gr.Button(value="Compile Memory")
@@ -191,7 +222,7 @@ if __name__ == "__main__":
             top_p = gr.Number(0.95, label="top_p")
             debug_txt =gr.Textbox(label="Debug", lines=15)        
         btn_process_text.click(query, inputs=[input_text,chatbot, system_prompt, user_name, bot_name, \
-                                              max_tokens, seed, temp, top_p], 
+                                              img_input, max_tokens, seed, temp, top_p], 
                                outputs=[input_text, chatbot, debug_txt])
         btn_compile.click(compile_memory, inputs=[chatbot, user_name, bot_name], outputs=[debug_txt])
         btn_save.click(save_memory, inputs=[chatbot, passphrase], outputs=[debug_txt])
