@@ -104,34 +104,36 @@ def query(message, history, systemprompt,user_name, bot_name, img_path, max_toke
     response = requests.post(api_url, data=json.dumps(in_data),  stream=True)
     response_text = ""
     
-    idx = 0
-    start_t = None
-    for line in response.iter_lines():
-        if line:
-            # print(line)
-            decoded_line = line.decode('utf-8').replace("data: ", "")
-            j_str = json.loads(decoded_line)
-            # if j_str['stop'] == "true":
-            #     print("-- STOP --")
-            #     return
-            if j_str['choices'][0]['finish_reason'] == "stop":
-                print("-- STOP --")
-                break
-            if j_str['choices'][0]['delta']['content'] :
-                response_text += j_str['choices'][0]['delta']['content']
-            # print(response_text)
-            idx += 1
+    try :
+        idx = 0
+        start_t = None
+        for line in response.iter_lines():
+            if line:
+                # print(line)
+                decoded_line = line.decode('utf-8').replace("data: ", "")
+                j_str = json.loads(decoded_line)
+                # if j_str['stop'] == "true":
+                #     print("-- STOP --")
+                #     return
+                if j_str['choices'][0]['finish_reason'] == "stop":
+                    print("-- STOP --")
+                    break
+                if j_str['choices'][0]['delta']['content'] :
+                    response_text += j_str['choices'][0]['delta']['content']
+                # print(response_text)
+                idx += 1
 
-            response_text, must_stop = check_stop_words(response_text, conf.stop_words)
-            if must_stop:
-                break
-            
-            yield message, history + [
-                {"role": "user", "content": message},
-                {"role": "assistant", "content": response_text}
-                ], \
-                response_text
-    
+                response_text, must_stop = check_stop_words(response_text, conf.stop_words)
+                if must_stop:
+                    break
+                
+                yield message, history + [
+                    {"role": "user", "content": message},
+                    {"role": "assistant", "content": response_text}
+                    ], \
+                    response_text
+    except Exception as e:
+        print(f"Exception during streaming: {e}")
     yield "", history + [
                 {"role": "user", "content": message},
                 {"role": "assistant", "content": response_text}
@@ -151,7 +153,8 @@ def compile_memory(history, user_name, bot_name):
     message = f"The following is a transcript of our conversation:\n\n{compiled}\n\nGenerate a concise summary of the key points discussed."
     response = call_llm_api_v1([{"role": "user", "content": message}], max_tokens=1024, seed=-1, temp=0.7, top_p=0.95)
     # print(f"Summary: {response}")
-    return response
+    new_history =  [{"role": "assistant", "content": response}] + history[-2:]
+    return new_history, response
 
 def save_memory(history, passphrase):
     os.makedirs("histories", exist_ok=True)
@@ -224,7 +227,7 @@ if __name__ == "__main__":
         btn_process_text.click(query, inputs=[input_text,chatbot, system_prompt, user_name, bot_name, \
                                               img_input, max_tokens, seed, temp, top_p], 
                                outputs=[input_text, chatbot, debug_txt])
-        btn_compile.click(compile_memory, inputs=[chatbot, user_name, bot_name], outputs=[debug_txt])
+        btn_compile.click(compile_memory, inputs=[chatbot, user_name, bot_name], outputs=[chatbot, debug_txt])
         btn_save.click(save_memory, inputs=[chatbot, passphrase], outputs=[debug_txt])
         btn_restore.click(restore_memory, inputs=[passphrase], outputs=[chatbot, debug_txt])
     query_interface.analytics_enabled = False
