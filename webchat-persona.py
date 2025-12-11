@@ -176,7 +176,7 @@ def restore_memory(passphrase):
 
 if __name__ == "__main__":
 
-    conf_file_name = "config.json"
+    conf_file_name = "config_ministral.json"
 
     opts, args = getopt.getopt(sys.argv[1:],"hc:")
     for opt, arg in opts:
@@ -208,7 +208,7 @@ if __name__ == "__main__":
         chatbot = gr.Chatbot(resizable=True)
         with gr.Row():
             input_text = gr.Textbox(label="Input", lines=2, value="",  placeholder="Type your message here...", scale=10)
-            img_input = gr.Image(type="filepath", label="Input Image (optional)", scale=2)
+            img_input = gr.Image(type="filepath", label="Input Image (optional)", scale=2, visible=False)
             btn_process_text = gr.Button(value=">", elem_id="my_btn", scale=1)
         with gr.Accordion("Advanced action", open=False) :
             btn_compile = gr.Button(value="Compile Memory")
