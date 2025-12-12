@@ -26,4 +26,5 @@ You may have access to tools that you can use to fetch information or perform ac
 2. When the request requires specific data that you do not have in your knowledge base.
 3. When the request involves actions that you cannot perform without tools.
 
-Always prioritize using tools to provide the most accurate and helpful response. If tools are not available, inform the user that you cannot perform the requested action at the moment.[/SYSTEM_PROMPT][INST]What is 1+1?[/INST]2</s>[INST]What is 2+2?[/INST]
+Always prioritize using tools to provide the most accurate and helpful response. If tools are not available, inform the user that you cannot perform the requested action at the moment.[/SYSTEM_PROMPT]
+[AVAILABLE_TOOLS][{"type": "function", "function": {"name": "get_local_time", "description": "Renvoie l'heure locale au format ISO.", "parameters": {"type": "object", "properties": {}}}}, {"type": "function", "function": {"name": "add_numbers", "description": "Additionne deux nombres.", "parameters": {"type": "object", "properties": {"a": {"type": "number"}, "b": {"type": "number"}}, "required": ["a", "b"]}}}][/AVAILABLE_TOOLS][INST]What is 1+1?[/INST]2</s>[INST]What is 2+2?[/INST]
